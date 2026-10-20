@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Today Tasks">
+<meta name="theme-color" content="#0A0A0A">
+<title>Today Tasks</title>
+<style>
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --mono: ui-monospace, "SF Mono", "Menlo", monospace;
+    --bg: #EDEDED;
+    --card: #fff;
+    --ink: #0A0A0A;
+    --muted: #555;
+    --border: #D5D5D5;
+    --green: #198754;
+    --yellow: #B7791F;
+    --red: #C0392B;
+    --blue: #2471A3;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    touch-action: manipulation;
+    overscroll-behavior: none;
+  }
+  #app { position: relative; height: 100vh; height: 100dvh; }
+  .screen {
+    position: absolute;
+    inset: 0;
+    bottom: calc(58px + var(--safe-bottom));
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    display: none;
+    padding-top: var(--safe-top);
+  }
+  .screen.active { display: block; }
+  .content { padding: 16px; padding-bottom: 40px; }
+
+  /* ==== Iconos ==== */
+  .ic { display: inline-block; vertical-align: middle; flex-shrink: 0; }
+
+  /* ==== Tasks header ==== */
+  .header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 8px; margin-bottom: 20px; gap: 12px; }
+  .title { font-size: 34px; font-weight: 800; letter-spacing: -1.5px; margin: 0; }
+  .new-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--ink); color: #fff;
+    padding: 10px 14px; border-radius: 4px; border: 0;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+  }
+  .new-btn:active { opacity: 0.8; }
+
+  /* ==== Stats ==== */
+  .stats-row { display: flex; gap: 10px; margin-bottom: 16px; }
+  .stat { flex: 1; background: var(--card); border-radius: 6px; padding: 10px; }
+  .stat-label { font-family: var(--mono); font-size: 9px; color: #444; letter-spacing: 0.5px; }
+  .stat-row { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+  .stat-value { font-size: 28px; font-weight: 800; }
+
+  /* ==== Filters ==== */
+  .filters { display: flex; gap: 8px; padding-bottom: 14px; overflow-x: auto; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .chip {
+    padding: 8px 12px; border-radius: 4px;
+    background: #E2E2E2; border: 0; color: #555;
+    font-family: var(--mono); font-size: 11px;
+    white-space: nowrap; cursor: pointer;
+  }
+  .chip.active { background: var(--ink); color: #fff; }
+
+  /* ==== Feedback ==== */
+  .feedback {
+    display: flex; align-items: center; gap: 8px;
+    background: #DDF5E7; border-radius: 6px;
+    padding: 12px; margin-bottom: 12px;
+    color: #146C43; font-size: 13px; font-weight: 600;
+  }
+
+  /* ==== Task card ==== */
+  .card {
+    background: var(--card); border-radius: 6px;
+    padding: 12px; margin-bottom: 14px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+    border-left: 4px solid;
+    cursor: pointer;
+    user-select: none;
+  }
+  .card:active { opacity: 0.7; }
+  .card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; gap: 8px; }
+  .badges { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .badge {
+    font-family: var(--mono); font-size: 9px;
+    padding: 3px 6px; border-radius: 2px;
+    overflow: hidden;
+  }
+  .badge-status { border: 1px solid; }
+  .badge-subject { background: #F0F0F0; color: #666; }
+  .due { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .due-text { font-family: var(--mono); font-size: 10px; color: #333; }
+  .overdue { color: var(--red); font-weight: 700; }
+  .status-steps { display: flex; gap: 3px; margin-bottom: 10px; }
+  .status-step { flex: 1; height: 4px; border-radius: 2px; background: #E2E2E2; }
+  .card-title { font-size: 17px; font-weight: 600; margin: 0 0 2px; }
+  .card-desc { font-size: 14px; color: #555; margin: 0 0 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .card-bottom { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .meta { display: flex; align-items: center; gap: 6px; padding: 3px 4px; }
+  .team-pill { background: #EAEAEA; border-radius: 2px; padding: 3px 8px; }
+  .meta-text { font-family: var(--mono); font-size: 11px; color: #222; }
+  .empty { text-align: center; color: #777; margin: 30px 0; }
+  .hint { text-align: center; color: #888; font-size: 11px; margin-top: 6px; }
+
+  /* ==== Tab bar ==== */
+  .tab-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: #fff;
+    display: flex;
+    padding-bottom: var(--safe-bottom);
+    border-top: 1px solid #E5E5E5;
+    z-index: 50;
+  }
+  .tab {
+    flex: 1; padding: 10px 0 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    background: none; border: 0; color: #888;
+    font-family: var(--mono); font-size: 10px;
+    cursor: pointer;
+  }
+  .tab.active { color: var(--ink); }
+  .tab .ic { color: inherit; }
+
+  /* ==== Pets screen ==== */
+  .pet-topbar {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 16px; background: #fff;
+    margin: calc(-1 * var(--safe-top)) -16px 0;
+    padding-top: calc(10px + var(--safe-top));
+  }
+  .top-left { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 36px; height: 36px; background: var(--ink); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .top-title { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+  .top-sub { font-family: var(--mono); font-size: 9px; color: #555; }
+  .top-right { display: flex; align-items: center; gap: 10px; }
+  .companion-tag { font-family: var(--mono); font-size: 10px; background: #EEE; padding: 3px 8px; border-radius: 3px; color: #222; }
+  .avatar { width: 36px; height: 36px; background: var(--ink); border: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; cursor: pointer; }
+
+  .pet-card { background: var(--card); border-radius: 6px; padding: 16px; margin-bottom: 14px; }
+  .header-row-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+  .pill { font-family: var(--mono); font-size: 10px; color: #444; background: #EEE; padding: 4px 10px; border-radius: 12px; }
+  .streak { display: flex; align-items: center; gap: 4px; background: var(--ink); padding: 4px 10px; border-radius: 12px; }
+  .streak-text { font-family: var(--mono); font-size: 10px; color: #fff; }
+  .pet-header-title { font-size: 24px; font-weight: 700; letter-spacing: -0.5px; margin: 0; }
+  .pet-name { font-family: var(--mono); font-size: 12px; color: #333; margin-top: 8px; }
+
+  .pet-frame-wrap { background: #F4F4F6; border-radius: 6px; padding: 16px; margin-bottom: 14px; }
+  .pet-frame {
+    align-self: center;
+    width: 220px; height: 220px;
+    background: #fff; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    margin: 12px auto;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    position: relative;
+    transition: transform 0.15s ease;
+  }
+  .pet-emoji { font-size: 110px; line-height: 1; }
+  .focus-badge { position: absolute; top: 10px; right: 10px; background: var(--ink); padding: 4px 8px; border-radius: 12px; }
+  .focus-text { font-family: var(--mono); font-size: 9px; color: #fff; }
+
+  .level-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; margin-bottom: 8px; }
+  .level-left { display: flex; align-items: center; gap: 6px; }
+  .level-text { font-size: 16px; font-weight: 500; }
+  .xp-text { font-family: var(--mono); font-size: 12px; color: #333; }
+  .track { height: 10px; background: #fff; border-radius: 5px; overflow: hidden; }
+  .fill { height: 100%; background: var(--ink); border-radius: 5px; transition: width 0.3s ease; }
+  .remaining { font-family: var(--mono); font-size: 10px; color: #444; text-align: center; margin-top: 10px; }
+
+  .feed-btn {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    background: var(--ink); color: #fff;
+    padding: 18px; border-radius: 4px; border: 0;
+    font-size: 20px; font-weight: 600; font-family: inherit;
+    width: 100%; cursor: pointer;
+  }
+  .feed-btn:active { opacity: 0.85; }
+  .feed-btn.disabled { opacity: 0.45; }
+  .snack-badge { background: rgba(255,255,255,0.15); padding: 3px 8px; border-radius: 10px; }
+  .snack-text { font-family: var(--mono); font-size: 11px; color: #fff; }
+  .pet-message { text-align: center; margin-top: 12px; font-size: 14px; font-weight: 500; }
+  .note-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; padding: 0 4px; }
+  .note { flex: 1; font-family: var(--mono); font-size: 10px; color: #555; text-align: center; }
+  .reset-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 18px; padding: 12px;
+    border: 1px solid #F2B8B5; border-radius: 4px;
+    background: #FFF5F4; color: #B42318;
+    font-family: var(--mono); font-size: 11px; font-weight: 700;
+    width: 100%; cursor: pointer;
+  }
+
+  /* ==== Modal ==== */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 100; display: none;
+  }
+  .modal-backdrop.show { display: block; }
+  .modal {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: #fff;
+    border-top-left-radius: 16px; border-top-right-radius: 16px;
+    max-height: 92dvh;
+    z-index: 101;
+    display: none;
+    flex-direction: column;
+    transform: translateY(100%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+    margin-top: var(--safe-top);
+  }
+  .modal.show { display: flex; transform: translateY(0); }
+  .sheet-header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px; border-bottom: 1px solid #EEE;
+    flex-shrink: 0;
+  }
+  .sheet-title-row { display: flex; align-items: center; gap: 8px; }
+  .sheet-title { font-size: 18px; font-weight: 600; }
+  .icon-btn { background: none; border: 0; padding: 6px; cursor: pointer; color: var(--ink); }
+  .sheet-body { padding: 14px; padding-bottom: 8px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
+  .field-label { font-family: var(--mono); font-size: 10px; color: #444; margin: 12px 0 6px; letter-spacing: 0.5px; }
+  .field-label-inline { font-family: var(--mono); font-size: 10px; color: #444; letter-spacing: 0.5px; }
+  .input {
+    width: 100%; border: 1px solid var(--border);
+    background: #F4F4F4; border-radius: 2px;
+    padding: 10px; font-size: 16px; font-family: inherit;
+    color: var(--ink); outline: none;
+  }
+  .input:focus { border-color: var(--ink); background: #fff; }
+  textarea.input { height: 80px; resize: none; text-align: left; }
+  .date-field { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  .date-field-text { flex: 1; font-size: 15px; }
+
+  .segment { display: flex; background: #F0F0F0; padding: 3px; border-radius: 4px; }
+  .segment-item {
+    flex: 1; padding: 9px; border: 0; background: none;
+    font-family: var(--mono); font-size: 12px; color: #555;
+    border-radius: 3px; cursor: pointer;
+    font-family: inherit;
+  }
+  .segment-item.active { background: var(--ink); color: #fff; }
+
+  .calendar { margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; background: #fff; padding: 8px; }
+  .cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+  .cal-nav { padding: 6px; background: none; border: 0; cursor: pointer; color: var(--ink); }
+  .cal-title { font-family: var(--mono); font-size: 12px; }
+  .cal-week { display: flex; }
+  .cal-week-text { width: 14.2857%; text-align: center; font-family: var(--mono); font-size: 10px; color: #888; padding: 4px 0; }
+  .cal-grid { display: flex; flex-wrap: wrap; }
+  .cal-cell { width: 14.2857%; height: 34px; display: flex; align-items: center; justify-content: center; border: 0; background: none; cursor: pointer; padding: 0; }
+  .cal-day { width: 30px; height: 30px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+  .cal-day.today { border: 1px solid var(--ink); }
+  .cal-day.selected { background: var(--ink); }
+  .cal-day-text { font-family: var(--mono); font-size: 12px; }
+  .cal-day.selected .cal-day-text { color: #fff; }
+
+  .time-picker { margin-top: 8px; border: 1px solid var(--border); border-radius: 4px; background: #fff; padding: 10px; }
+  .time-preview { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 0; margin-bottom: 8px; border-bottom: 1px solid #EEE; }
+  .time-preview-text { font-family: var(--mono); font-size: 20px; font-weight: 700; }
+  .time-section { font-family: var(--mono); font-size: 10px; color: #888; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .time-row { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .time-row::-webkit-scrollbar { display: none; }
+  .time-chip {
+    min-width: 44px; padding: 8px 10px;
+    border-radius: 4px; background: #F0F0F0;
+    border: 1px solid #E0E0E0; color: #333;
+    font-family: var(--mono); font-size: 13px;
+    cursor: pointer; flex-shrink: 0;
+  }
+  .time-chip.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .pickers-row { display: flex; gap: 8px; margin-top: 14px; }
+  .picker-col { flex: 1; min-width: 0; }
+  .picker-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .new-link { font-family: var(--mono); font-size: 10px; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; }
+  .picker-box { display: flex; align-items: center; justify-content: flex-start; cursor: pointer; text-align: left; }
+  .picker-text { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .picker-text.placeholder { color: #9A9A9A; }
+
+  .options-panel { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .option {
+    padding: 8px 12px; border-radius: 2px;
+    background: #F0F0F0; border: 1px solid #E0E0E0;
+    color: #333; font-size: 13px; font-family: inherit;
+    cursor: pointer;
+  }
+  .option.active { background: var(--ink); border-color: var(--ink); color: #fff; }
+
+  .add-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+  .add-btn { background: var(--ink); color: #fff; padding: 11px 12px; border: 0; border-radius: 2px; font-size: 13px; font-weight: 600; cursor: pointer; }
+
+  .team-box {
+    display: flex; align-items: center;
+    border: 1px solid var(--border); background: #F4F4F4;
+    border-radius: 2px; padding: 12px; margin-top: 14px;
+    gap: 10px;
+  }
+  .team-title { font-size: 14px; font-weight: 500; }
+  .team-sub { font-family: var(--mono); font-size: 10px; color: #666; margin-top: 2px; }
+  .switch {
+    position: relative; width: 51px; height: 31px;
+    background: #D9D9D9; border-radius: 16px;
+    border: 0; cursor: pointer; transition: background 0.2s;
+    flex-shrink: 0;
+  }
+  .switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 27px; height: 27px; background: #fff;
+    border-radius: 50%; transition: transform 0.2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .switch.on { background: var(--ink); }
+  .switch.on::after { transform: translateX(20px); }
+
+  .error-text { color: #C62828; font-size: 12px; margin-top: 10px; }
+
+  .sheet-footer {
+    display: flex; justify-content: flex-end; gap: 10px;
+    padding: 14px; padding-bottom: calc(14px + var(--safe-bottom));
+    border-top: 1px solid #EEE;
+    flex-shrink: 0;
+    background: #fff;
+  }
+  .cancel-btn {
+    padding: 12px 18px; border: 1px solid #D0D0D0; border-radius: 4px;
+    background: #fff; font-size: 15px; font-family: inherit; color: var(--ink); cursor: pointer;
+  }
+  .save-btn {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--ink); color: #fff;
+    padding: 12px 18px; border: 0; border-radius: 4px;
+    font-size: 15px; font-weight: 600; font-family: inherit; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <main id="screen-tasks" class="screen active">
+    <div class="content" id="tasks-content"></div>
+  </main>
+  <main id="screen-pets" class="screen">
+    <div class="content" id="pets-content"></div>
+  </main>
+  <nav class="tab-bar">
+    <button class="tab active" data-tab="tasks">
+      <span data-icon="checkbox" data-size="22"></span>
+      <span>Tareas</span>
+    </button>
+    <button class="tab" data-tab="pets">
+      <span data-icon="heart" data-size="22"></span>
+      <span>Mascota</span>
+    </button>
+  </nav>
+
+  <div class="modal-backdrop" id="modal-backdrop"></div>
+  <div class="modal" id="task-modal"></div>
+</div>
+
+<script>
+/* ============================================================
+   1. ICONOS (SVG inline, estilo Lucide)
+   ============================================================ */
+const ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  x: '<path d="M18 6L6 18M6 6l12 12"/>',
+  check: '<polyline points="20 6 9 17 4 12"/>',
+  'chevron-down': '<polyline points="6 9 12 15 18 9"/>',
+  'chevron-up': '<polyline points="18 15 12 9 6 15"/>',
+  'chevron-left': '<polyline points="15 18 9 12 15 6"/>',
+  'chevron-right': '<polyline points="9 18 15 12 9 6"/>',
+  'alert-circle': '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+  calendar: '<rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
+  link: '<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>',
+  users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  user: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
+  send: '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+  'check-circle': '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>',
+  hourglass: '<path d="M6 2v6l4 4-4 4v6"/><path d="M18 2v6l-4 4 4 4v6"/>',
+  flame: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
+  trophy: '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2z"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>',
+  edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>',
+  utensils: '<path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3zm0 0v7"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  school: '<path d="M14 22v-4a2 2 0 1 0-4 0v4"/><path d="M18 10l4 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-8l4-2"/><path d="M18 5v17"/><path d="M4 6l8-4 8 4"/><path d="M6 5v17"/>',
+  cloud: '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+  'git-network': '<circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M6 21V9a9 9 0 0 0 9 9"/>',
+  checkbox: '<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>',
+  'add-circle': '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>',
+  heart: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>',
+};
+
+function ic(name, size = 18) {
+  const paths = ICONS[name] || '';
+  return `<svg class="ic" xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${paths}</svg>`;
+}
+
+// Sustituye los [data-icon] estáticos (tab bar)
+document.querySelectorAll('[data-icon]').forEach((el) => {
+  el.outerHTML = ic(el.dataset.icon, Number(el.dataset.size || 18));
+});
+
+/* ============================================================
+   2. ESTADO Y PERSISTENCIA (localStorage)
+   ============================================================ */
+const STORAGE_KEY = 'today-tasks-v1';
+
+const DEFAULT_STATE = {
+  tasks: [],
+  pet: { name: 'Profesor Búho', xp: 0, snacks: 3, streak: 1, lastActiveDate: null },
+  subjects: ['Matemáticas', 'Ciencias', 'Historia', 'Lengua'],
+  platforms: ['Classroom', 'Canvas', 'Teams', 'Moodle'],
+};
+
+let state = load();
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULT_STATE);
+    const parsed = JSON.parse(raw);
+    return { ...structuredClone(DEFAULT_STATE), ...parsed };
+  } catch (e) {
+    return structuredClone(DEFAULT_STATE);
+  }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch (e) { console.warn('No se pudo guardar:', e); }
+}
+
+/* ============================================================
+   3. HELPERS (fechas, formato, lógica mascota)
+   ============================================================ */
+const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+const MONTHS_SHORT = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const DAYS_SHORT = ['dom','lun','mar','mié','jue','vie','sáb'];
+const WEEK_HEAD = ['L','M','M','J','V','S','D'];
+const pad = (n) => String(n).padStart(2, '0');
+
+const STATUS_LABEL = { pendiente: 'Pendiente', terminado: 'Terminado', enviado: 'Enviado' };
+const STATUS_COLOR = { pendiente: '#B7791F', terminado: '#198754', enviado: '#2471A3' };
+const STATUS_BADGE = {
+  pendiente: { bg: '#FFF4D6', color: '#8A5A00', border: '#F2D38A' },
+  terminado: { bg: '#DDF5E7', color: '#146C43', border: '#A9E4BD' },
+  enviado:   { bg: '#DDEEFF', color: '#1F5D87', border: '#A8D2F2' },
+};
+const PLATFORM_ICON = { Classroom: 'school', Canvas: 'cloud', Teams: 'users', Moodle: 'git-network' };
+
+function sameDay(a, b) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+function formatDue(dueAt) {
+  const due = new Date(dueAt);
+  const now = new Date();
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (dueAt < Date.now()) return { label: 'Vencida', icon: 'alert-circle' };
+  if (sameDay(due, now)) return { label: 'Hoy', icon: 'clock' };
+  if (sameDay(due, tomorrow)) return { label: 'Mañana', icon: 'calendar' };
+  return { label: `${due.getDate()} ${MONTHS_SHORT[due.getMonth()]}`, icon: 'calendar' };
+}
+
+function formatDateLabel(d) {
+  const today = new Date();
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  if (sameDay(d, today)) return `Hoy · ${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  if (sameDay(d, tomorrow)) return `Mañana · ${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]}`;
+  return `${DAYS_SHORT[d.getDay()]} ${d.getDate()} ${MONTHS_SHORT[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function levelInfo(xp) {
+  const level = Math.floor(xp / 100) + 1;
+  const current = xp % 100;
+  const needed = 100;
+  return { level, current, needed, remaining: needed - current };
+}
+
+function touchStreak() {
+  const today = new Date().toDateString();
+  if (state.pet.lastActiveDate === today) return;
+  const yesterday = new Date(); yesterday.setDate(yesterday.getDate() - 1);
+  if (state.pet.lastActiveDate === yesterday.toDateString()) state.pet.streak += 1;
+  else state.pet.streak = 1;
+  state.pet.lastActiveDate = today;
+}
+
+/* ============================================================
+   4. ESTADO DE UI
+   ============================================================ */
+const ui = {
+  tab: 'tasks',
+  filter: 'todos',
+  feedback: '',
+  feedbackTimer: null,
+  petSettingsOpen: false,
+  petMessage: '',
+  petMessageTimer: null,
+};
+
+const modal = {
+  visible: false,
+  editing: null,
+  title: '',
+  description: '',
+  status: 'pendiente',
+  dueDate: new Date(),
+  time: '20:00',
+  subject: '',
+  platform: null,
+  team: false,
+  openPicker: null,
+  adding: null,
+  newName: '',
+  error: '',
+  calendarOpen: false,
+  timeOpen: false,
+  calMonth: new Date().getMonth(),
+  calYear: new Date().getFullYear(),
+};
+
+/* ============================================================
+   5. RENDER: TASKS
+   ============================================================ */
+function renderTasks() {
+  const tasks = state.tasks;
+  const counts = {
+    todos: tasks.length,
+    pendiente: tasks.filter(t => t.status === 'pendiente').length,
+    terminado: tasks.filter(t => t.status === 'terminado').length,
+    enviado: tasks.filter(t => t.status === 'enviado').length,
+  };
+  const visible = (ui.filter === 'todos' ? tasks : tasks.filter(t => t.status === ui.filter))
+    .slice().sort((a, b) => a.dueAt - b.dueAt);
+
+  const filters = [
+    ['todos', 'Todos'],
+    ['pendiente', 'Pendientes'],
+    ['terminado', 'Terminados'],
+    ['enviado', 'Enviados'],
+  ];
+
+  const html = `
+    <div class="header-row">
+      <h1 class="title">Mis Tareas</h1>
+      <button class="new-btn" onclick="openNewTask()">${ic('plus', 18)} Nueva</button>
+    </div>
+
+    <div class="stats-row">
+      ${stat('PENDIENTES', counts.pendiente, 'hourglass')}
+      ${stat('TERMINADAS', counts.terminado, 'check-circle')}
+      ${stat('ENVIADAS', counts.enviado, 'send')}
+    </div>
+
+    <div class="filters">
+      ${filters.map(([f, label]) => `
+        <button class="chip ${ui.filter === f ? 'active' : ''}" onclick="setFilter('${f}')">
+          ${label} (${counts[f]})
+        </button>`).join('')}
+    </div>
+
+    ${ui.feedback ? `
+      <div class="feedback">
+        ${ic('gift', 18)}
+        <span>${escapeHtml(ui.feedback)}</span>
+      </div>` : ''}
+
+    ${visible.length === 0
+      ? `<p class="empty">No hay tareas en esta vista.</p>`
+      : visible.map(taskCard).join('')}
+
+    ${visible.length > 0 ? `
+      <p class="hint">Toca una tarea para editarla · mantén presionada para eliminarla</p>` : ''}
+  `;
+  document.getElementById('tasks-content').innerHTML = html;
+}
+
+function stat(label, value, iconName) {
+  return `
+    <div class="stat">
+      <div class="stat-label">${label}</div>
+      <div class="stat-row">
+        <span class="stat-value">${String(value).padStart(2, '0')}</span>
+        ${ic(iconName, 18)}
+      </div>
+    </div>`;
+}
+
+function taskCard(t) {
+  const due = formatDue(t.dueAt);
+  const overdue = t.status === 'pendiente' && t.dueAt < Date.now();
+  const platformIcon = (t.platform && PLATFORM_ICON[t.platform]) || 'link';
+  const steps = t.platform ? ['pendiente', 'terminado', 'enviado'] : ['pendiente', 'terminado'];
+  const badge = STATUS_BADGE[t.status];
+
+  return `
+    <div class="card" style="border-left-color: ${STATUS_COLOR[t.status]}"
+         onclick="openEditTask('${t.id}')"
+         ontouchstart="cardTouchStart(event, '${t.id}')"
+         ontouchend="cardTouchEnd(event)"
+         ontouchmove="cardTouchMove(event)">
+      <div class="card-top">
+        <div class="badges">
+          <span class="badge badge-status" style="background:${badge.bg}; color:${badge.color}; border-color:${badge.border}">
+            ${STATUS_LABEL[t.status].toUpperCase()}
+          </span>
+          <span class="badge badge-subject">${escapeHtml(t.subject || '—').toUpperCase()}</span>
+        </div>
+        <div class="due">
+          ${ic(due.icon, 13)}
+          <span class="due-text ${overdue ? 'overdue' : ''}">${due.label}</span>
+        </div>
+      </div>
+      <div class="status-steps">
+        ${steps.map(s => `<div class="status-step" style="${s === t.status ? `background:${STATUS_COLOR[s]}` : ''}"></div>`).join('')}
+      </div>
+      <h3 class="card-title">${escapeHtml(t.title)}</h3>
+      <p class="card-desc">${escapeHtml(t.description || '—')}</p>
+      <div class="card-bottom">
+        <div class="meta">
+          ${t.platform ? `${ic(platformIcon, 14)}<span class="meta-text">${escapeHtml(t.platform)}</span>` : ''}
+        </div>
+        <div class="meta ${t.team ? 'team-pill' : ''}">
+          ${ic(t.team ? 'users' : 'user', 13)}
+          <span class="meta-text">${t.team ? 'En equipo' : 'Individual'}</span>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* Gestión de pulsación larga para eliminar (600 ms) */
+let touchTimer = null;
+let touchStartPos = null;
+function cardTouchStart(e, id) {
+  touchStartPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  touchTimer = setTimeout(() => {
+    touchTimer = null;
+    if (confirm(`¿Eliminar esta tarea?`)) {
+      state.tasks = state.tasks.filter(t => t.id !== id);
+      save(); renderTasks();
+    }
+  }, 600);
+}
+function cardTouchEnd() {
+  if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+  touchStartPos = null;
+}
+function cardTouchMove(e) {
+  if (!touchStartPos || !touchTimer) return;
+  const dx = Math.abs(e.touches[0].clientX - touchStartPos.x);
+  const dy = Math.abs(e.touches[0].clientY - touchStartPos.y);
+  if (dx > 10 || dy > 10) {
+    clearTimeout(touchTimer); touchTimer = null;
+  }
+}
+
+/* ============================================================
+   6. RENDER: PETS
+   ============================================================ */
+function renderPets() {
+  const { level, current, needed, remaining } = levelInfo(state.pet.xp);
+  const pct = (current / needed) * 100;
+
+  const html = `
+    <div class="pet-topbar">
+      <div class="top-left">
+        <div class="logo">${ic('checkbox', 20)}</div>
+        <div>
+          <div class="top-title">TODAY TASKS</div>
+          <div class="top-sub">● ONLINE // V2.4</div>
+        </div>
+      </div>
+      <div class="top-right">
+        <span class="companion-tag">Compañero</span>
+        <button class="avatar" onclick="togglePetSettings()" aria-label="Ajustes">
+          ${ic('settings', 20)}
+        </button>
+      </div>
+    </div>
+
+    <div class="pet-card" style="margin-top:14px">
+      <div class="header-row-flex">
+        <span class="pill">COMPAÑERO VIRTUAL</span>
+        <div class="streak">
+          ${ic('flame', 12)}
+          <span class="streak-text">Racha de ${state.pet.streak} días</span>
+        </div>
+      </div>
+      <h2 class="pet-header-title">Mi Compañero de Estudio</h2>
+      <div class="pet-name">● ${escapeHtml(state.pet.name)}</div>
+    </div>
+
+    <div class="pet-frame-wrap">
+      <div class="pet-frame" id="pet-frame">
+        <span class="pet-emoji">🦉</span>
+        <div class="focus-badge"><span class="focus-text">● ENFOQUE ACTIVO</span></div>
+      </div>
+
+      <div class="level-row">
+        <div class="level-left">
+          ${ic('trophy', 16)}
+          <span class="level-text">Nivel ${level}</span>
+        </div>
+        <span class="xp-text">${current} / ${needed} XP</span>
+      </div>
+      <div class="track"><div class="fill" style="width:${pct}%"></div></div>
+      <p class="remaining">Faltan ${remaining} XP para desbloquear Nivel ${level + 1}</p>
+    </div>
+
+    <div class="pet-card">
+      <button class="feed-btn ${state.pet.snacks === 0 ? 'disabled' : ''}" onclick="onFeedPet()">
+        ${ic('utensils', 22)}
+        <span>Dar de comer</span>
+        <span class="snack-badge"><span class="snack-text">🍎 x${state.pet.snacks}</span></span>
+      </button>
+
+      ${ui.petMessage ? `<p class="pet-message">${escapeHtml(ui.petMessage)}</p>` : ''}
+
+      <div class="note-row">
+        ${ic('check-circle', 16)}
+        <span class="note">Snacks ganados completando tareas de tu lista diaria</span>
+      </div>
+
+      ${ui.petSettingsOpen ? `
+        <button class="reset-btn" onclick="onResetPet()">
+          ${ic('refresh', 16)}
+          <span>Reiniciar datos de la mascota</span>
+        </button>` : ''}
+    </div>
+  `;
+  document.getElementById('pets-content').innerHTML = html;
+}
+
+function onFeedPet() {
+  if (state.pet.snacks <= 0) {
+    ui.petMessage = 'No tienes snacks. ¡Completa tareas para ganarlos!';
+    renderPets();
+    return;
+  }
+  const oldLevel = Math.floor(state.pet.xp / 100);
+  state.pet.snacks -= 1;
+  state.pet.xp += 30;
+  const newLevel = Math.floor(state.pet.xp / 100);
+  save();
+
+  ui.petMessage = newLevel > oldLevel ? '¡Subió de nivel! 🎉' : '¡Ñam! +30 XP';
+  renderPets();
+
+  // Animación bounce
+  const frame = document.getElementById('pet-frame');
+  if (frame) {
+    const anim = newLevel > oldLevel
+      ? [{ transform: 'scale(1.2) rotate(-5deg)' }, { transform: 'scale(1) rotate(5deg)' }, { transform: 'scale(1) rotate(0)' }]
+      : [{ transform: 'scale(1.12)' }, { transform: 'scale(1)' }];
+    frame.animate(anim, { duration: 400, easing: 'ease-out' });
+  }
+
+  clearTimeout(ui.petMessageTimer);
+  ui.petMessageTimer = setTimeout(() => { ui.petMessage = ''; renderPets(); }, 2500);
+}
+
+function onResetPet() {
+  if (!confirm('Se perderán el nivel, XP, snacks y racha de la mascota. Las tareas no se modificarán. ¿Continuar?')) return;
+  state.pet = { name: state.pet.name, xp: 0, snacks: 3, streak: 1, lastActiveDate: null };
+  save(); renderPets();
+}
+
+function togglePetSettings() {
+  ui.petSettingsOpen = !ui.petSettingsOpen;
+  renderPets();
+}
+
+/* ============================================================
+   7. MODAL: abrir/cerrar/editar
+   ============================================================ */
+function openNewTask() {
+  modal.editing = null;
+  modal.title = '';
+  modal.description = '';
+  modal.status = 'pendiente';
+  modal.dueDate = new Date();
+  modal.time = '20:00';
+  modal.subject = state.subjects[0] || '';
+  modal.platform = state.platforms[0] || null;
+  modal.team = false;
+  modal.openPicker = null;
+  modal.adding = null;
+  modal.newName = '';
+  modal.error = '';
+  modal.calendarOpen = false;
+  modal.timeOpen = false;
+  modal.calMonth = new Date().getMonth();
+  modal.calYear = new Date().getFullYear();
+  modal.visible = true;
+  renderModal();
+  showModal();
+}
+
+function openEditTask(id) {
+  const task = state.tasks.find(t => t.id === id);
+  if (!task) return;
+  const d = new Date(task.dueAt);
+  modal.editing = id;
+  modal.title = task.title;
+  modal.description = task.description;
+  modal.status = task.status;
+  modal.dueDate = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  modal.time = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  modal.subject = task.subject;
+  modal.platform = task.platform;
+  modal.team = task.team;
+  modal.openPicker = null;
+  modal.adding = null;
+  modal.newName = '';
+  modal.error = '';
+  modal.calendarOpen = false;
+  modal.timeOpen = false;
+  modal.calMonth = d.getMonth();
+  modal.calYear = d.getFullYear();
+  modal.visible = true;
+  renderModal();
+  showModal();
+}
+
+function showModal() {
+  document.getElementById('modal-backdrop').classList.add('show');
+  const m = document.getElementById('task-modal');
+  m.classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal-backdrop').classList.remove('show');
+  const m = document.getElementById('task-modal');
+  m.classList.remove('show');
+  modal.visible = false;
+}
+
+/* ============================================================
+   8. RENDER: MODAL
+   ============================================================ */
+function renderModal() {
+  if (!modal.visible) return;
+  const editing = !!modal.editing;
+  const statusOptions = modal.platform
+    ? ['pendiente', 'terminado', 'enviado']
+    : ['pendiente', 'terminado'];
+
+  const modalEl = document.getElementById('task-modal');
+  modalEl.innerHTML = `
+    <div class="sheet-header">
+      <div class="sheet-title-row">
+        ${ic(editing ? 'edit' : 'add-circle', 20)}
+        <span class="sheet-title">${editing ? 'Editar Tarea' : 'Nueva Tarea'}</span>
+      </div>
+      <button class="icon-btn" onclick="closeModal()">${ic('x', 22)}</button>
+    </div>
+
+    <div class="sheet-body">
+      <div class="field-label">TÍTULO DE LA ACTIVIDAD *</div>
+      <input class="input" id="m-title" type="text" value="${escapeAttr(modal.title)}" placeholder="Ej. Informe de Laboratorio" oninput="modal.title=this.value; modal.error=''">
+
+      <div class="field-label">DESCRIPCIÓN BREVE</div>
+      <textarea class="input" id="m-desc" placeholder="Detalles o apuntes sobre la entrega..." oninput="modal.description=this.value">${escapeHtml(modal.description)}</textarea>
+
+      <div class="field-label">ESTADO</div>
+      <div class="segment">
+        ${statusOptions.map(st => `
+          <button class="segment-item ${modal.status === st ? 'active' : ''}" onclick="setModalStatus('${st}')">
+            ${STATUS_LABEL[st]}
+          </button>`).join('')}
+      </div>
+
+      <div class="field-label">FECHA DE ENTREGA</div>
+      <div class="input date-field" onclick="toggleCalendar()">
+        ${ic('calendar', 16)}
+        <span class="date-field-text">${formatDateLabel(modal.dueDate)}</span>
+        ${ic(modal.calendarOpen ? 'chevron-up' : 'chevron-down', 16)}
+      </div>
+      ${modal.calendarOpen ? renderCalendar() : ''}
+
+      <div class="field-label">HORA DE ENTREGA</div>
+      <div class="input date-field" onclick="toggleTime()">
+        ${ic('clock', 16)}
+        <span class="date-field-text">${modal.time}</span>
+        ${ic(modal.timeOpen ? 'chevron-up' : 'chevron-down', 16)}
+      </div>
+      ${modal.timeOpen ? renderTimePicker() : ''}
+
+      <div class="pickers-row">
+        <div class="picker-col">
+          <div class="picker-header">
+            <span class="field-label-inline">MATERIA</span>
+            <button class="new-link" onclick="startAdding('subject')">+ Nueva</button>
+          </div>
+          <button class="input picker-box" onclick="togglePicker('subject')">
+            <span class="picker-text ${modal.subject ? '' : 'placeholder'}">
+              ${escapeHtml(modal.subject || 'Seleccionar')}
+            </span>
+          </button>
+        </div>
+        <div class="picker-col">
+          <div class="picker-header">
+            <span class="field-label-inline">PLATAFORMA</span>
+            <button class="new-link" onclick="startAdding('platform')">+ Nueva</button>
+          </div>
+          <button class="input picker-box" onclick="togglePicker('platform')">
+            <span class="picker-text ${modal.platform ? '' : 'placeholder'}">
+              ${escapeHtml(modal.platform || 'Sin plataforma')}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      ${modal.openPicker ? renderOptions() : ''}
+      ${modal.adding ? renderAddRow() : ''}
+
+      <div class="team-box">
+        ${ic(modal.team ? 'users' : 'user', 18)}
+        <div style="flex:1; margin-left:10px">
+          <div class="team-title">¿Es en equipo?</div>
+          <div class="team-sub">${modal.team ? 'Sí (En equipo)' : 'No (Individual)'}</div>
+        </div>
+        <button class="switch ${modal.team ? 'on' : ''}" onclick="modal.team=!modal.team; renderModal()" aria-label="Equipo"></button>
+      </div>
+
+      ${modal.error ? `<p class="error-text">${escapeHtml(modal.error)}</p>` : ''}
+    </div>
+
+    <div class="sheet-footer">
+      <button class="cancel-btn" onclick="closeModal()">Cancelar</button>
+      <button class="save-btn" onclick="saveTask()">
+        ${ic('check', 18)}
+        ${editing ? 'Guardar cambios' : 'Guardar tarea'}
+      </button>
+    </div>
+  `;
+}
+
+function renderCalendar() {
+  const offset = (new Date(modal.calYear, modal.calMonth, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(modal.calYear, modal.calMonth + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < offset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const today = new Date();
+  const isToday = (d) => sameDay(today, new Date(modal.calYear, modal.calMonth, d));
+  const isSelected = (d) => sameDay(modal.dueDate, new Date(modal.calYear, modal.calMonth, d));
+
+  return `
+    <div class="calendar">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="shiftMonth(-1)">${ic('chevron-left', 16)}</button>
+        <span class="cal-title">${MONTHS[modal.calMonth]} ${modal.calYear}</span>
+        <button class="cal-nav" onclick="shiftMonth(1)">${ic('chevron-right', 16)}</button>
+      </div>
+      <div class="cal-week">
+        ${WEEK_HEAD.map(w => `<div class="cal-week-text">${w}</div>`).join('')}
+      </div>
+      <div class="cal-grid">
+        ${cells.map((d, i) => {
+          if (d === null) return `<div class="cal-cell"></div>`;
+          const sel = isSelected(d);
+          const td = isToday(d);
+          return `
+            <button class="cal-cell" onclick="pickDay(${d})">
+              <span class="cal-day ${td && !sel ? 'today' : ''} ${sel ? 'selected' : ''}">
+                <span class="cal-day-text">${d}</span>
+              </span>
+            </button>`;
+        }).join('')}
+      </div>
+    </div>`;
+}
+
+function renderTimePicker() {
+  const [hStr, mStr] = modal.time.split(':');
+  const h = Number(hStr) || 0;
+  const m = Number(mStr) || 0;
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+  const baseMinutes = Array.from({ length: 12 }, (_, i) => i * 5);
+  const minuteOptions = baseMinutes.includes(m) ? baseMinutes : [...baseMinutes, m].sort((a,b) => a-b);
+
+  return `
+    <div class="time-picker">
+      <div class="time-preview">
+        ${ic('clock', 16)}
+        <span class="time-preview-text">${pad(h)}:${pad(m)}</span>
+      </div>
+      <div class="time-section">HORA</div>
+      <div class="time-row">
+        ${hours.map(hh => `
+          <button class="time-chip ${h === hh ? 'active' : ''}" onclick="setHour(${hh})">${pad(hh)}</button>
+        `).join('')}
+      </div>
+      <div class="time-section" style="margin-top:10px">MINUTOS</div>
+      <div class="time-row">
+        ${minuteOptions.map(mm => `
+          <button class="time-chip ${m === mm ? 'active' : ''}" onclick="setMinute(${mm})">${pad(mm)}</button>
+        `).join('')}
+      </div>
+    </div>`;
+}
+
+function renderOptions() {
+  const isSubject = modal.openPicker === 'subject';
+  const items = isSubject ? state.subjects : state.platforms;
+  return `
+    <div class="options-panel">
+      ${!isSubject ? `
+        <button class="option ${modal.platform === null ? 'active' : ''}" onclick="choosePlatform(null)">
+          Sin plataforma
+        </button>` : ''}
+      ${items.map(opt => {
+        const active = isSubject ? modal.subject === opt : modal.platform === opt;
+        const action = isSubject ? `pickSubject('${escapeAttr(opt)}')` : `choosePlatform('${escapeAttr(opt)}')`;
+        return `<button class="option ${active ? 'active' : ''}" onclick="${action}"
+                  ontouchstart="optionTouchStart(event, '${isSubject ? 'subject' : 'platform'}', '${escapeAttr(opt)}')"
+                  ontouchend="optionTouchEnd()"
+                  ontouchmove="optionTouchMove()">${escapeHtml(opt)}</button>`;
+      }).join('')}
+    </div>`;
+}
+
+function renderAddRow() {
+  return `
+    <div class="add-row">
+      <input class="input" id="m-new-name" type="text" placeholder="${modal.adding === 'subject' ? 'Nueva materia' : 'Nueva plataforma'}" value="${escapeAttr(modal.newName)}" oninput="modal.newName=this.value" onkeydown="if(event.key==='Enter'){confirmNew();}">
+      <button class="add-btn" onclick="confirmNew()">Agregar</button>
+      <button class="icon-btn" onclick="modal.adding=null; modal.newName=''; renderModal()">${ic('x', 20)}</button>
+    </div>`;
+}
+
+/* Long-press para eliminar materia/plataforma */
+let optTimer = null;
+let optPos = null;
+function optionTouchStart(e, type, name) {
+  optPos = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  optTimer = setTimeout(() => {
+    optTimer = null;
+    if (confirm(`¿Eliminar "${name}" de tus opciones? Las tareas existentes no cambiarán.`)) {
+      if (type === 'subject') {
+        state.subjects = state.subjects.filter(s => s !== name);
+        if (modal.subject === name) modal.subject = '';
+      } else {
+        state.platforms = state.platforms.filter(p => p !== name);
+        if (modal.platform === name) { modal.platform = null; if (modal.status === 'enviado') modal.status = 'pendiente'; }
+      }
+      save(); renderModal();
+    }
+  }, 600);
+}
+function optionTouchEnd() { if (optTimer) { clearTimeout(optTimer); optTimer = null; } optPos = null; }
+function optionTouchMove(e) {
+  if (!optPos || !optTimer) return;
+  const dx = Math.abs(e.touches[0].clientX - optPos.x);
+  const dy = Math.abs(e.touches[0].clientY - optPos.y);
+  if (dx > 10 || dy > 10) { clearTimeout(optTimer); optTimer = null; }
+}
+
+/* ============================================================
+   9. HANDLERS del modal
+   ============================================================ */
+function setModalStatus(st) {
+  modal.status = st;
+  renderModal();
+}
+function toggleCalendar() {
+  modal.calendarOpen = !modal.calendarOpen;
+  modal.timeOpen = false;
+  renderModal();
+}
+function toggleTime() {
+  modal.timeOpen = !modal.timeOpen;
+  modal.calendarOpen = false;
+  renderModal();
+}
+function shiftMonth(delta) {
+  const nd = new Date(modal.calYear, modal.calMonth + delta, 1);
+  modal.calMonth = nd.getMonth();
+  modal.calYear = nd.getFullYear();
+  renderModal();
+}
+function pickDay(d) {
+  modal.dueDate = new Date(modal.calYear, modal.calMonth, d);
+  modal.calendarOpen = false;
+  renderModal();
+}
+function setHour(h) {
+  const m = modal.time.split(':')[1];
+  modal.time = `${pad(h)}:${m}`;
+  renderModal();
+}
+function setMinute(mm) {
+  const h = modal.time.split(':')[0];
+  modal.time = `${h}:${pad(mm)}`;
+  renderModal();
+}
+function togglePicker(which) {
+  modal.openPicker = modal.openPicker === which ? null : which;
+  modal.adding = null;
+  renderModal();
+}
+function pickSubject(name) {
+  modal.subject = name;
+  modal.openPicker = null;
+  renderModal();
+}
+function choosePlatform(name) {
+  modal.platform = name;
+  if (!name && modal.status === 'enviado') modal.status = 'pendiente';
+  modal.openPicker = null;
+  renderModal();
+}
+function startAdding(which) {
+  modal.adding = which;
+  modal.openPicker = null;
+  modal.newName = '';
+  renderModal();
+  requestAnimationFrame(() => document.getElementById('m-new-name')?.focus());
+}
+function confirmNew() {
+  const name = modal.newName.trim();
+  if (!name) return;
+  if (modal.adding === 'subject') {
+    if (!state.subjects.includes(name)) state.subjects.push(name);
+    modal.subject = name;
+  } else if (modal.adding === 'platform') {
+    if (!state.platforms.includes(name)) state.platforms.push(name);
+    modal.platform = name;
+  }
+  save();
+  modal.adding = null;
+  modal.newName = '';
+  modal.openPicker = null;
+  renderModal();
+}
+
+function saveTask() {
+  if (!modal.title.trim()) { modal.error = 'El título es obligatorio.'; renderModal(); return; }
+  const m = modal.time.match(/^([01]?\d|2[0-3]):([0-5]\d)$/);
+  if (!m) { modal.error = 'Hora inválida.'; renderModal(); return; }
+
+  const due = new Date(modal.dueDate);
+  due.setHours(Number(m[1]), Number(m[2]), 0, 0);
+
+  const payload = {
+    title: modal.title.trim(),
+    description: modal.description.trim(),
+    status: modal.status,
+    dueAt: due.getTime(),
+    subject: modal.subject,
+    platform: modal.platform,
+    team: modal.team,
+  };
+
+  let gaveSnack = false;
+
+  if (modal.editing) {
+    const task = state.tasks.find(t => t.id === modal.editing);
+    if (task) {
+      const wasTerminado = task.status === 'terminado';
+      Object.assign(task, payload);
+      if (!wasTerminado && payload.status === 'terminado') {
+        state.pet.snacks += 1;
+        touchStreak();
+        gaveSnack = true;
+      }
+    }
+  } else {
+    const newTask = { id: Date.now().toString() + Math.random().toString(36).slice(2, 7), ...payload };
+    state.tasks.push(newTask);
+    if (payload.status === 'terminado') {
+      state.pet.snacks += 1;
+      touchStreak();
+      gaveSnack = true;
+    }
+  }
+
+  save();
+  closeModal();
+  renderTasks();
+  renderPets();
+  if (gaveSnack) showFeedback('¡Tarea completada! +1 snack para tu mascota');
+}
+
+function showFeedback(msg) {
+  ui.feedback = msg;
+  renderTasks();
+  clearTimeout(ui.feedbackTimer);
+  ui.feedbackTimer = setTimeout(() => { ui.feedback = ''; renderTasks(); }, 2500);
+}
+
+/* ============================================================
+   10. NAVEGACIÓN + UTILIDADES
+   ============================================================ */
+function setFilter(f) { ui.filter = f; renderTasks(); }
+function switchTab(tab) {
+  ui.tab = tab;
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  document.getElementById(`screen-${tab}`).classList.add('active');
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
+}
+document.querySelectorAll('.tab').forEach(el => {
+  el.addEventListener('click', () => switchTab(el.dataset.tab));
+});
+document.getElementById('modal-backdrop').addEventListener('click', closeModal);
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+}
+function escapeAttr(str) { return escapeHtml(str); }
+
+/* ============================================================
+   11. INICIALIZACIÓN
+   ============================================================ */
+renderTasks();
+renderPets();
+</script>
+</body>
+</html>
